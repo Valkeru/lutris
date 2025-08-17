@@ -174,6 +174,14 @@ class LutrisApplication(Gtk.Application):
             None,
         )
         self.add_main_option(
+            "extra-args",
+            0,
+            GLib.OptionFlags.NONE,
+            GLib.OptionArg.STRING,
+            _("Additional arguments should be added to arguments in a game config"),
+            None
+        )
+        self.add_main_option(
             "list-games",
             ord("l"),
             GLib.OptionFlags.NONE,
@@ -429,7 +437,7 @@ class LutrisApplication(Gtk.Application):
         # Workaround broken pygobject bindings
         command_line.do_print_literal(command_line, string + "\n")
 
-    def generate_script(self, db_game, script_path):
+    def generate_script(self, db_game, script_path, extra_args):
         """Output a script to a file.
         The script is capable of launching a game without the client
         """
@@ -440,6 +448,11 @@ class LutrisApplication(Gtk.Application):
         game = Game(db_game["id"])
         game.game_error.register(on_error)
         game.reload_config()
+
+        if extra_args:
+            args = self.merge_args(game, extra_args)
+            game.config.game_config["args"] = args
+
         game.write_script(script_path, self.launch_ui_delegate)
 
     def do_handle_local_options(self, options):
@@ -703,7 +716,7 @@ class LutrisApplication(Gtk.Application):
             if not db_game or not db_game["id"]:
                 logger.warning("No game provided to generate the script")
                 return 1
-            self.generate_script(db_game, options.lookup_value("output-script").get_string())
+            self.generate_script(db_game, options.lookup_value("output-script").get_string(), options.lookup_value("extra-args"))
             return 0
 
         # Graphical commands
@@ -758,6 +771,10 @@ class LutrisApplication(Gtk.Application):
             game = Game(db_game["id"])
             game.game_error.register(on_error)
             game.launch(self.launch_ui_delegate)
+
+            if options.contains("extra-args"):
+                args = self.merge_args(game, options.lookup_value("extra-args"))
+                game.config.game_config["args"] = args
 
             if game.state == game.STATE_STOPPED and not self.window.is_visible():
                 self.quit()
@@ -1069,3 +1086,8 @@ Also, check that the version specified is in the correct format.
 
     def has_tray_icon(self):
         return self.tray and self.tray.is_visible()
+
+    @staticmethod
+    def merge_args(game, extra_args):
+        args = game.config.game_config["args"] + " " + extra_args.get_string()
+        return args

@@ -24,6 +24,15 @@ def generate_script(
     game = Game(db_game["id"])
     game.game_error.register(on_error)
     game.reload_config()
+
+    if extra_args:
+        args = merge_args(game, extra_args)
+        game.config.game_config["args"] = args
+
     game.write_script(script_path, launch_ui_delegate)
     absolutePath = os.path.abspath(script_path)
     logger.info(f"Wrote script to: '{absolutePath}'")
+
+def merge_args(game, extra_args):
+    args = game.config.game_config["args"] + " " + extra_args.get_string()
+    return args

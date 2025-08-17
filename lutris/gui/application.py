@@ -58,6 +58,7 @@ from lutris.util.steam.config import get_steamapps_dirs
 
 from ..util.busy import BusyAsyncCall
 from ..util.standalone_scripts import generate_script
+from ..util.standalone_scripts import merge_args
 from .lutriswindow import LutrisWindow
 
 LUTRIS_EXPERIMENTAL_FEATURES_ENABLED = os.environ.get("LUTRIS_EXPERIMENTAL_FEATURES_ENABLED") == "1"
@@ -179,6 +180,14 @@ class LutrisApplication(Gtk.Application):
             GLib.OptionArg.STRING,
             _("Execute a program with the Lutris Runtime"),
             None,
+        )
+        self.add_main_option(
+            "extra-args",
+            0,
+            GLib.OptionFlags.NONE,
+            GLib.OptionArg.STRING,
+            _("Additional arguments should be added to arguments in a game config"),
+            None
         )
         self.add_main_option(
             "list-games",
@@ -508,7 +517,7 @@ class LutrisApplication(Gtk.Application):
                     searchstring,
                 )
                 return 1
-            generate_script(logger, self.launch_ui_delegate, export_script_game, f"{export_script_game['slug']}.sh")
+            generate_script(logger, self.launch_ui_delegate, export_script_game, f"{export_script_game['slug']}.sh", options.lookup_value("extra-args"))
             return 0
 
         # List game
@@ -781,6 +790,10 @@ class LutrisApplication(Gtk.Application):
             game = Game(str(db_game["id"]))
             game.game_error.register(on_error)
             game.launch(self.launch_ui_delegate)
+
+            if options.contains("extra-args"):
+                args = merge_args(game, options.lookup_value("extra-args"))
+                game.config.game_config["args"] = args
 
             if game.state == game.STATE_STOPPED and self.window and not self.window.is_visible():
                 self.quit()
